@@ -1,10 +1,11 @@
 # %%
 import numpy as np
+import torch as t
 from typing import Tuple
 import matplotlib.pyplot as plt
 # %%
 
-def test_rotation(dim: int=10, small_val: float = 0.01, num_large_vals: int = 2, orders_of_magnitude: int = 2, dtype = np.float32) -> Tuple[np.ndarray, np.ndarray]:
+def test_rotation(dim: int=10, small_val: float = 0.01, num_large_vals: int = 2, orders_of_magnitude: int = 2, dtype = t.float32) -> Tuple[np.ndarray, np.ndarray]:
     """
     dim: Dimension of space
     small_val: Value for the "base" values
@@ -14,31 +15,39 @@ def test_rotation(dim: int=10, small_val: float = 0.01, num_large_vals: int = 2,
     """
     assert num_large_vals < dim
 
+    # Handle both torch and numpy dtypes in this function
+    backend = t if isinstance(dtype, t.dtype) else np
+    backend_randn = t.randn if backend == t else np.random.randn
+
     # If we can't even store the large number to begin
     # with, this test isn't interesting
-    if 10 ** orders_of_magnitude > np.finfo(dtype).max:
+    if 10 ** orders_of_magnitude > backend.finfo(dtype).max:
         return (None, None)
 
-    vec = np.ones((dim,), dtype=dtype) * small_val
+    vec = backend.ones((dim,), dtype=dtype) * small_val
     vec[0:num_large_vals] *= 10.0 ** orders_of_magnitude
 
     # Generate a random rotation matrix
-    rot = np.linalg.svd(np.random.randn(dim, dim), full_matrices=True)[0].astype(dtype)
+    rot = backend.linalg.svd(backend_randn(dim, dim), full_matrices=True)[0]
+    rot = rot.to(dtype) if backend == t else rot.astype(dtype)
 
     # Rotate vec out and back again
     vec_result = vec @ rot @ rot.T
     return vec, vec_result
 
 # %%
-# TODO: Need to use torch for bfloat16?
-types = [np.float16, np.float32, np.float64]
+types = [t.bfloat16, np.float16, np.float32, t.float32, np.float64, t.float64]
 res = {typ: [] for typ in types}
 for dtype in types:
     for i in range(20):
         num_large_vals = 3 
         out, back = test_rotation(num_large_vals=num_large_vals, orders_of_magnitude=i, dtype=dtype, small_val=1)
         if back is not None:
+            # What's the std of the small values? If there's no loss in precision it would be 0.
             back_std = back[num_large_vals:].std()
+            # matplotlib is unhappy plotting bfloat16
+            if dtype == t.bfloat16:
+                back_std = back_std.to(t.float32)
             res[dtype].append(back_std)
 
 for k, l in res.items():
