@@ -36,7 +36,8 @@ def test_rotation(dim: int=10, small_val: float = 0.01, num_large_vals: int = 2,
     return vec, vec_result
 
 # %%
-types = [t.bfloat16, np.float16, np.float32, t.float32, np.float64, t.float64]
+types = [t.bfloat16, np.float16, np.float32, t.float32, t.float64, np.float64]
+printed = []
 res = {typ: [] for typ in types}
 for dtype in types:
     for i in range(20):
@@ -55,6 +56,7 @@ for k, l in res.items():
 
 plt.yscale('log')
 plt.xlabel("relative orders of magnitude")
+plt.xticks(range(0, 20, 2))
 plt.ylabel("std of results")
 plt.legend()
 # %%
