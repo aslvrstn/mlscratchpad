@@ -60,3 +60,28 @@ plt.xticks(range(0, 20, 2))
 plt.ylabel("std of results")
 plt.legend()
 # %%
+
+def test_constant_rotation(dim: int=10, val: float = 10, dtype = t.float32) -> Tuple[np.ndarray, np.ndarray]:
+    """
+    dim: Dimension of space
+    val: Constant value
+    dtype: dtype to do this all in
+    """
+    # Handle both torch and numpy dtypes in this function
+    backend = t if isinstance(dtype, t.dtype) else np
+    backend_randn = t.randn if backend == t else np.random.randn
+
+    vec = backend.ones((dim,), dtype=dtype) * val
+
+    # Generate a random rotation matrix
+    rot = backend.linalg.svd(backend_randn(dim, dim), full_matrices=True)[0]
+    rot = rot.to(dtype) if backend == t else rot.astype(dtype)
+
+    # Rotate vec out and back again
+    vec_result = vec @ rot @ rot.T
+    return vec, vec_result
+
+print("t.bfloat16", test_constant_rotation(dtype=t.bfloat16))
+print("np.float16", test_constant_rotation(dtype=np.float16))
+print("t.float32", test_constant_rotation(dtype=t.float32))
+# %%
