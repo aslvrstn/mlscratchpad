@@ -1,4 +1,6 @@
 # %%
+from re import A
+from tkinter import W
 import numpy as np
 import torch as t
 from typing import Tuple, Union
@@ -105,4 +107,27 @@ test_constant_rotation(dtype=t.bfloat16)
 test_constant_rotation(dtype=np.float16)
 test_constant_rotation(dtype=t.float32)
 test_constant_rotation(dtype=np.float32)
+# %%
+def test_with_separate_rotations(dim: int=10, orders_of_magnitude=2, dtype=t.float32):
+    backend = t if isinstance(dtype, t.dtype) else np
+    vec = backend.ones((dim,), dtype=dtype)
+    vec[0:num_large_vals] *= 10.0 ** orders_of_magnitude
+
+    rot = t.linalg.svd(t.randn((dim, dim), dtype=t.float64), full_matrices=True)[0]
+    if backend is np:
+        rot = rot.numpy()
+
+    high_prec_type = t.float64 if backend is t else np.float64
+
+    # Rotate all as one
+    rotated_vec = as_type(vec, high_prec_type) @ rot
+    # Then as completely separate features
+    diag_vec = vec.diag() if backend is t else np.diag(vec)
+    rotated_split_vec = as_type(diag_vec, high_prec_type) @ rot
+
+    # Make sure that splitting and recombining is equivalent
+    np.testing.assert_array_almost_equal(rotated_vec, rotated_split_vec.sum(0), decimal=13)
+
+test_with_separate_rotations(dtype=np.float16)
+test_with_separate_rotations(dtype=t.float32)
 # %%
