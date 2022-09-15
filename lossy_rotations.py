@@ -182,4 +182,17 @@ plt.xticks(range(0, 20, 2))
 plt.ylabel("std of results")
 plt.title("Combined in rotated basis")
 plt.legend()
+
+plt.figure()
+
+for i, k in enumerate(back_together_stds.keys()):
+    plt.plot(back_together_stds[k], label=f"{k} combined", color=f"C{i}")
+    plt.plot(back_separate_stds[k], label=f"{k} separate", color=f"C{i}", dashes=[1])
+
+plt.yscale('log')
+plt.xlabel("relative orders of magnitude")
+plt.xticks(range(0, 20, 2))
+plt.ylabel("std of results")
+plt.title("Comparing losses combined vs not")
+plt.legend()
 # %%
