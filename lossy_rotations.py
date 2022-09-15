@@ -14,18 +14,15 @@ def as_type(arr: Union[np.ndarray, t.Tensor], dtype: Union[np.dtype, t.dtype]) -
         raise ValueError(f"Unknown array type: {arr.dtype}")
 
 def random_rotate_precise(arr: Union[np.ndarray, t.Tensor], downcast_in_rotated_space=True) -> Union[np.ndarray, t.Tensor]:
-    # Handle both torch and numpy dtypes in this function
-    backend = t if isinstance(arr, t.Tensor) else np
-    backend_randn = t.randn if backend is t else np.random.randn
-
-    # Generate a random rotation matrix of appropriate size
-    dim = len(arr)
-    rot = backend.linalg.svd(backend_randn(dim, dim), full_matrices=True)[0]
-
+    # Generate a random rotation matrix of appropriate size.
     # And make the rotation matrix high precision so that nothing is lost in
     # the rotation, since that's not what we're testing
-    high_prec_type = t.float64 if backend is t else np.float64
-    rot = as_type(rot, high_prec_type)
+    dim = len(arr)
+    rot = t.linalg.svd(t.randn((dim, dim), dtype=t.float64), full_matrices=True)[0]
+    if not isinstance(arr, t.Tensor):
+        rot = rot.numpy()
+
+    high_prec_type = t.float64 if isinstance(arr, t.Tensor) else np.float64
 
     # Apply the rotation after first upcasting our vector
     rotated_arr = as_type(arr, high_prec_type) @ rot
