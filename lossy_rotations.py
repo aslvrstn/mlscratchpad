@@ -108,7 +108,7 @@ test_constant_rotation(dtype=np.float16)
 test_constant_rotation(dtype=t.float32)
 test_constant_rotation(dtype=np.float32)
 # %%
-def test_with_separate_rotations(dim: int=10, orders_of_magnitude=2, dtype=t.float32):
+def test_with_separate_rotations(dim: int=10, num_large_vals: int = 2, orders_of_magnitude=2, dtype=t.float32):
     backend = t if isinstance(dtype, t.dtype) else np
     vec = backend.ones((dim,), dtype=dtype)
     vec[0:num_large_vals] *= 10.0 ** orders_of_magnitude
@@ -121,13 +121,65 @@ def test_with_separate_rotations(dim: int=10, orders_of_magnitude=2, dtype=t.flo
 
     # Rotate all as one
     rotated_vec = as_type(vec, high_prec_type) @ rot
-    # Then as completely separate features
+    # Then as completely separate features. This will cause the separate
+    # features to not interfere (be combined into a single float) and so should
+    # let us measure the loss coming from downcasting in a rotated basis separately
+    # from the loss from combining representations
     diag_vec = vec.diag() if backend is t else np.diag(vec)
     rotated_split_vec = as_type(diag_vec, high_prec_type) @ rot
 
     # Make sure that splitting and recombining is equivalent
-    np.testing.assert_array_almost_equal(rotated_vec, rotated_split_vec.sum(0), decimal=13)
+    # np.testing.assert_array_almost_equal(rotated_vec, rotated_split_vec.sum(0), decimal=10)
 
-test_with_separate_rotations(dtype=np.float16)
-test_with_separate_rotations(dtype=t.float32)
+    orig_downcast_together = as_type(as_type(rotated_vec, dtype), high_prec_type) @ rot.T
+    orig_downcast_separate = as_type(as_type(rotated_split_vec, dtype), high_prec_type) @ rot.T
+
+    # The separated version should recover a higher precision version of the
+    # original along the diagonal, and the off diagonals should be near zero.
+    return orig_downcast_together, orig_downcast_separate.diagonal()
+
+
+test_with_separate_rotations(dim=10, orders_of_magnitude=5, dtype=np.float16)
+test_with_separate_rotations(dim=10, orders_of_magnitude=5, dtype=t.float32)
+
+types = [t.bfloat16, np.float16, np.float32, t.float32, t.float64, np.float64]
+printed = []
+back_together_stds = {typ: [] for typ in types}
+back_separate_stds = {typ: [] for typ in types}
+for dtype in types:
+    for i in range(20):
+        num_large_vals = 3 
+        back_together, back_separate = test_with_separate_rotations(num_large_vals=num_large_vals, orders_of_magnitude=i, dtype=dtype)
+        if back_separate is not None:
+            # What's the std of the small values? If there's no loss in precision it would be 0.
+            back_together_std = back_together[num_large_vals:].std()
+            back_separate_std = back_separate[num_large_vals:].std()
+            # matplotlib is unhappy plotting bfloat16
+            if dtype == t.bfloat16:
+                back_together_std = back_together_std.to(t.float32)
+                back_separate_std = back_separate_std.to(t.float32)
+            back_together_stds[dtype].append(back_together_std)
+            back_separate_stds[dtype].append(back_separate_std)
+
+for k, l in back_separate_stds.items():
+    plt.plot(l, label=k)
+
+plt.yscale('log')
+plt.xlabel("relative orders of magnitude")
+plt.xticks(range(0, 20, 2))
+plt.ylabel("std of results (not combined in rotated basis)")
+plt.title("Not combined in rotated basis")
+plt.legend()
+
+plt.figure()
+
+for k, l in back_together_stds.items():
+    plt.plot(l, label=k)
+
+plt.yscale('log')
+plt.xlabel("relative orders of magnitude")
+plt.xticks(range(0, 20, 2))
+plt.ylabel("std of results")
+plt.title("Combined in rotated basis")
+plt.legend()
 # %%
