@@ -12,6 +12,7 @@ import numpy as np
 
 from phantom_tensors import parse
 from phantom_tensors._parse import HasShape
+from phantom_module import PhantomModule, make_typed
 
 from phantom_tensors.numpy import NDArray
 from phantom_tensors.torch import Tensor
@@ -35,13 +36,6 @@ class Config:
 
 cfg = Config(10000, 32)
 
-class PhantomModule(t.nn.Module):
-    def __init__(self):
-        super().__init__()
-
-    def __call__(self, x: int) -> int:
-        return super().__call__()
-
 class Embed(PhantomModule):
     def __init__(self, cfg: Config):
         super().__init__()
@@ -60,7 +54,7 @@ class Unembed(PhantomModule):
         self.W_U = t.nn.Parameter(t.empty(cfg.d_model, cfg.vocab_size))
         t.nn.init.kaiming_uniform_(self.W_U)
 
-    def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
+    def forward(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]:
         foo = einsum("mod voc, bat pos mod -> bat pos voc", self.W_U, x)
         return parse(foo, Tensor[Bat, Pos, Vocab])
 
@@ -69,17 +63,17 @@ class Unembed(PhantomModule):
 class EmbedUnembedModel(PhantomModule):
     def __init__(self, cfg: Config):
         super().__init__()
-        self.embed = Embed(cfg)
-        self.unembed = Unembed(cfg)
+        self.embed = make_typed(Embed(cfg))
+        self.unembed = make_typed(Unembed(cfg))
 
-    def forward(self, x: Tensor[Bat, Pos]):
+    def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
         return self.unembed(self.embed(x))
 
 testEmbedUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
 bargle = testEmbedUnembed.forward(typed_input)
 
-def func_on_3d(x: NDArray[Vocab, Vocab]):
+def func_on_3d(x: Tensor[Bat, Pos, Vocab]):
     print(x)
 
 func_on_3d(bargle)
