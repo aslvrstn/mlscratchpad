@@ -1,24 +1,14 @@
 # %%
 
 from dataclasses import dataclass
-import nntplib
-import this
-from turtle import forward
+from typing import NewType
+
 import torch as t
-
-from typing import NewType, Any
-
-import numpy as np
-
+from fancy_einsum import einsum
 from phantom_tensors import parse
-from phantom_tensors._parse import HasShape
-from phantom_module import PhantomModule, make_typed
-
-from phantom_tensors.numpy import NDArray
 from phantom_tensors.torch import Tensor
 
-from fancy_einsum import einsum
-
+from phantom_module import PhantomModule, make_typed
 
 A = NewType("A", int)
 B = NewType("B", int)
@@ -73,8 +63,9 @@ testEmbedUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
 bargle = testEmbedUnembed.forward(typed_input)
 
-def func_on_3d(x: Tensor[Bat, Pos, Vocab]):
-    print(x)
+def func_on_good_output(x: Tensor[Bat, Pos, Vocab]): ...
+def func_on_bad_output(x: Tensor[Vocab, Pos, Vocab]): ...
 
-func_on_3d(bargle)
+func_on_good_output(bargle)  # Happy
+func_on_bad_output(bargle)  # Unhappy
 # %%
