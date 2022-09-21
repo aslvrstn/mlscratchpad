@@ -4,7 +4,7 @@ from torch.nn import Module
 from typing_extensions import ParamSpec, Protocol
 
 P = ParamSpec("P")
-R = TypeVar("R")
+R = TypeVar("R", covariant=True)
 
 
 class HasForward(Protocol[P, R]):
