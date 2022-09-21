@@ -1,3 +1,5 @@
+# %%
+
 from typing_extensions import ParamSpec, Protocol
 from typing import TypeVar, Generic, TYPE_CHECKING, cast, Type
 from torch.nn import Module
@@ -17,8 +19,8 @@ class PhantomModule(Generic[P, R], Module):
         def __call__(self, *args: P.args, **kwds: P.kwargs) -> R:
             return super().__call__(*args, **kwds)
 
-def make_typed(cls: Type[HasForward[P, R]]) -> Type[PhantomModule[P, R]]:
-    return cast(Type[PhantomModule[P, R]], cls)
+def make_typed(cls: HasForward[P, R]) -> PhantomModule[P, R]:
+    return cast(PhantomModule[P, R], cls)
 
 
 # This is non-critical and just an example
@@ -30,7 +32,7 @@ class FunkyNN(PhantomModule):
     def forward(self, x: int) -> int:
         return x
 
-model = make_typed(FunkyNN)(arg=3)
+model = make_typed(FunkyNN(arg=3))
 
 out = model(x=1)  # Happy
 out = model(x="str")  # Sad
