@@ -35,7 +35,14 @@ class Config:
 
 cfg = Config(10000, 32)
 
-class Embed(t.nn.Module):
+class PhantomModule(t.nn.Module):
+    def __init__(self):
+        super().__init__()
+
+    def __call__(self, x: int) -> int:
+        return super().__call__()
+
+class Embed(PhantomModule):
     def __init__(self, cfg: Config):
         super().__init__()
 
@@ -46,7 +53,7 @@ class Embed(t.nn.Module):
         return parse(self.W_E[x, :], Tensor[Bat, Pos, Mod])
 
 
-class Unembed(t.nn.Module):
+class Unembed(PhantomModule):
     def __init__(self, cfg: Config):
         super().__init__()
 
@@ -59,7 +66,7 @@ class Unembed(t.nn.Module):
 
 # %%
 
-class EmbedUnembedModel(t.nn.Module):
+class EmbedUnembedModel(PhantomModule):
     def __init__(self, cfg: Config):
         super().__init__()
         self.embed = Embed(cfg)
@@ -70,7 +77,7 @@ class EmbedUnembedModel(t.nn.Module):
 
 testEmbedUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
-bargle: Tensor[Bat, Pos, Vocab] = testEmbedUnembed.forward(typed_input)
+bargle = testEmbedUnembed.forward(typed_input)
 
 def func_on_3d(x: NDArray[Vocab, Vocab]):
     print(x)
