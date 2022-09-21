@@ -19,12 +19,15 @@ Tok = NewType("Tok", int)
 Mod = NewType("Mod", int)
 Vocab = NewType("Vocab", int)
 
+
 @dataclass
 class Config:
     vocab_size: int
     d_model: int
 
+
 cfg = Config(10000, 32)
+
 
 class Embed(PhantomModule):
     def __init__(self, cfg: Config):
@@ -48,7 +51,9 @@ class Unembed(PhantomModule):
         foo = einsum("mod voc, bat pos mod -> bat pos voc", self.W_U, x)
         return parse(foo, Tensor[Bat, Pos, Vocab])
 
+
 # %%
+
 
 class EmbedUnembedModel(PhantomModule):
     def __init__(self, cfg: Config):
@@ -59,12 +64,19 @@ class EmbedUnembedModel(PhantomModule):
     def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
         return self.unembed(self.embed(x))
 
+
 testEmbedUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
 bargle = testEmbedUnembed.forward(typed_input)
 
-def func_on_good_output(x: Tensor[Bat, Pos, Vocab]): ...
-def func_on_bad_output(x: Tensor[Vocab, Pos, Vocab]): ...
+
+def func_on_good_output(x: Tensor[Bat, Pos, Vocab]):
+    ...
+
+
+def func_on_bad_output(x: Tensor[Vocab, Pos, Vocab]):
+    ...
+
 
 func_on_good_output(bargle)  # Happy
 func_on_bad_output(bargle)  # Unhappy
