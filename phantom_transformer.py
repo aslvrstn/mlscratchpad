@@ -34,11 +34,11 @@ class Embed(t.Module):
         self.W_E = t.nn.Parameter(t.empty(cfg.vocab_size, cfg.d_model))
         t.nn.init.kaiming_uniform_(self.W_E)
 
-    if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]: ...
-
     def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]:
         return parse(self.W_E[x, :], Tensor[Bat, Pos, Mod])
+
+    if TYPE_CHECKING:
+        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]: return self.forward(x)
 
 
 class Unembed(t.Module):
@@ -48,12 +48,12 @@ class Unembed(t.Module):
         self.W_U = t.nn.Parameter(t.empty(cfg.d_model, cfg.vocab_size))
         t.nn.init.kaiming_uniform_(self.W_U)
 
-    if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]: ...
-
     def forward(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]:
         foo = einsum("mod voc, bat pos mod -> bat pos voc", self.W_U, x)
         return parse(foo, Tensor[Bat, Pos, Vocab])
+
+    if TYPE_CHECKING:
+        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]: return self.forward(x)
 
 
 # %%
@@ -72,6 +72,9 @@ class EmbedUnembedModel(t.Module):
 testEmbedUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
 bargle = testEmbedUnembed.forward(typed_input)
+
+
+# %%
 
 
 def func_on_good_output(x: Tensor[Bat, Pos, Vocab]):
