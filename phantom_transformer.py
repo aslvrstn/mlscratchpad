@@ -1,14 +1,12 @@
 # %%
 
 from dataclasses import dataclass
-from typing import NewType
+from typing import TYPE_CHECKING, NewType
 
 import torch as t
 from fancy_einsum import einsum
 from phantom_tensors import parse
 from phantom_tensors.torch import Tensor
-
-from phantom_module import PhantomModule, make_typed
 
 A = NewType("A", int)
 B = NewType("B", int)
@@ -29,23 +27,29 @@ class Config:
 cfg = Config(10000, 32)
 
 
-class Embed(PhantomModule):
+class Embed(t.Module):
     def __init__(self, cfg: Config):
         super().__init__()
 
         self.W_E = t.nn.Parameter(t.empty(cfg.vocab_size, cfg.d_model))
         t.nn.init.kaiming_uniform_(self.W_E)
 
+    if TYPE_CHECKING:
+        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]: ...
+
     def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]:
         return parse(self.W_E[x, :], Tensor[Bat, Pos, Mod])
 
 
-class Unembed(PhantomModule):
+class Unembed(t.Module):
     def __init__(self, cfg: Config):
         super().__init__()
 
         self.W_U = t.nn.Parameter(t.empty(cfg.d_model, cfg.vocab_size))
         t.nn.init.kaiming_uniform_(self.W_U)
+
+    if TYPE_CHECKING:
+        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]: ...
 
     def forward(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]:
         foo = einsum("mod voc, bat pos mod -> bat pos voc", self.W_U, x)
@@ -55,11 +59,11 @@ class Unembed(PhantomModule):
 # %%
 
 
-class EmbedUnembedModel(PhantomModule):
+class EmbedUnembedModel(t.Module):
     def __init__(self, cfg: Config):
         super().__init__()
-        self.embed = make_typed(Embed(cfg))
-        self.unembed = make_typed(Unembed(cfg))
+        self.embed = Embed(cfg)
+        self.unembed = Unembed(cfg)
 
     def forward(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
         return self.unembed(self.embed(x))
