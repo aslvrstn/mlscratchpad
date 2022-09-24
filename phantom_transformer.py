@@ -4,9 +4,11 @@ from dataclasses import dataclass
 from turtle import forward
 from typing import TYPE_CHECKING, NewType
 from typing_extensions import reveal_type
+from phantom import Predicate
 
 import torch as t
 from fancy_einsum import einsum
+from typed_einsum import einsum as typed_einsum
 from phantom_tensors import parse
 from phantom_tensors.torch import Tensor
 
@@ -18,6 +20,7 @@ Pos = NewType("Pos", int)
 Tok = NewType("Tok", int)
 Mod = NewType("Mod", int)
 Vocab = NewType("Vocab", int)
+Head = NewType("Head", int)
 HeadN = NewType("HeadN", int)
 
 
@@ -44,7 +47,9 @@ class Embed(t.nn.Module):
         return parse(self.W_E[x, :], Tensor[Bat, Pos, Mod])
 
     if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]: return self.forward(x)
+
+        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Mod]:
+            return self.forward(x)
 
 
 class Unembed(t.nn.Module):
@@ -55,11 +60,17 @@ class Unembed(t.nn.Module):
         t.nn.init.kaiming_uniform_(self.W_U)
 
     def forward(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]:
-        foo = einsum("mod voc, bat pos mod -> bat pos voc", self.W_U, x)
-        return parse(foo, Tensor[Bat, Pos, Vocab])
+        return typed_einsum(
+            Tensor[Mod, Vocab],
+            Tensor[Bat, Pos, Mod],
+            out_type=Tensor[Bat, Pos, Vocab],
+            tensors=[self.W_U, x],
+        )
 
     if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]: return self.forward(x)
+
+        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Vocab]:
+            return self.forward(x)
 
 
 class Attention(t.nn.Module):
@@ -80,26 +91,68 @@ class Attention(t.nn.Module):
         self.attn_scale = t.sqrt(t.tensor(cfg.d_head))
 
     def forward(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Mod]:
-        q = parse(einsum("headn head mod, bat pos mod -> bat pos headn mod", self.W_Q, x), Tensor[Bat, Pos, HeadN, Mod])
-        k = parse(einsum("headn head mod, bat pos mod -> bat pos headn mod", self.W_K, x), Tensor[Bat, Pos, HeadN, Mod])
-        v = parse(einsum("headn head mod, bat pos mod -> bat pos headn mod", self.W_V, x), Tensor[Bat, Pos, HeadN, Mod])
+        q = typed_einsum(
+            Tensor[HeadN, Head, Mod],
+            Tensor[Bat, Pos, Mod],
+            out_type=Tensor[Bat, Pos, HeadN, Mod],
+            tensors=[self.W_Q, x],
+        )
+        k = typed_einsum(
+            Tensor[HeadN, Head, Mod],
+            Tensor[Bat, Pos, Mod],
+            out_type=Tensor[Bat, Pos, HeadN, Mod],
+            tensors=[self.W_K, x],
+        )
+        v = typed_einsum(
+            Tensor[HeadN, Head, Mod],
+            Tensor[Bat, Pos, Mod],
+            out_type=Tensor[Bat, Pos, HeadN, Mod],
+            tensors=[self.W_V, x],
+        )
 
-        attn = parse(einsum("bat posq headn mod, bat posk headn mod -> bat headn posq posk", q, k), Tensor[Bat, HeadN, Pos, Pos]) / self.attn_scale
+        PosQ = NewType("PosQ", int)
+        PosK = NewType("PosK", int)
+        attn = (
+            typed_einsum(
+                Tensor[Bat, PosQ, HeadN, Mod],
+                Tensor[Bat, PosK, HeadN, Mod],
+                out_type=Tensor[Bat, HeadN, PosQ, PosK],
+                tensors=[q, k],
+            )
+            / self.attn_scale
+        )
 
         masked_attn = t.where(self.causal_mask, attn, -1e4)
         attn_probs = t.softmax(masked_attn, -1)
 
-        attn_paid = parse(einsum("bat headn posq posk, bat posk headn mod -> bat posq headn mod", attn_probs, v), Tensor[Bat, Pos, HeadN, Mod])
+        attn_paid = typed_einsum(
+            Tensor[Bat, HeadN, PosQ, PosK],
+            Tensor[Bat, PosK, HeadN, Mod],
+            out_type=Tensor[Bat, PosQ, HeadN, Mod],
+            tensors=[attn_probs, v],
+        )
 
-        prereduce = parse(einsum("bat headn mod head, bat pos headn mod -> bat pos headn mod", v, attn_paid), Tensor[Bat, Pos, HeadN, Mod])
-        result = parse(einsum("imh,bqih->bqim", self.W_O, prereduce), Tensor[Bat, Pos, HeadN, Mod])
+        prereduce = typed_einsum(
+            Tensor[Bat, HeadN, Mod, Head],
+            Tensor[Bat, Pos, HeadN, Mod],
+            out_type=Tensor[Bat, Pos, HeadN, Mod],
+            tensors=[v, attn_paid],
+        )
+        result = typed_einsum(
+            Tensor[HeadN, Mod, Head],
+            Tensor[Bat, PosQ, HeadN, Head],
+            out_type=Tensor[Bat, Pos, HeadN, Mod],
+            tensors=[self.W_O, prereduce],
+        )
 
         out = parse(result.sum(-2), Tensor[Bat, Pos, Mod])
         return out
 
-
     if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Mod]: return self.forward(x)
+
+        def __call__(self, x: Tensor[Bat, Pos, Mod]) -> Tensor[Bat, Pos, Mod]:
+            return self.forward(x)
+
 
 # %%
 
@@ -114,7 +167,9 @@ class EmbedUnembedModel(t.nn.Module):
         return self.unembed(self.embed(x))
 
     if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]: return self.forward(x)
+
+        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
+            return self.forward(x)
 
 
 testEmbedUnembed = EmbedUnembedModel(cfg)
@@ -137,6 +192,7 @@ func_on_good_output(bargle)  # Happy
 func_on_bad_output(bargle)  # Unhappy
 # %%
 
+
 class EmbedAttendUnembedModel(t.nn.Module):
     def __init__(self, cfg: Config):
         super().__init__()
@@ -148,9 +204,12 @@ class EmbedAttendUnembedModel(t.nn.Module):
         return self.unembed(self.one_attn(self.embed(x)))
 
     if TYPE_CHECKING:
-        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]: return self.forward(x)
+
+        def __call__(self, x: Tensor[Bat, Pos]) -> Tensor[Bat, Pos, Vocab]:
+            return self.forward(x)
 
 
 testEmbedAttendUnembed = EmbedUnembedModel(cfg)
 typed_input = parse(t.tensor([[50, 999]]), Tensor[Bat, Pos])
 bargle = testEmbedAttendUnembed(typed_input)
+# %%
