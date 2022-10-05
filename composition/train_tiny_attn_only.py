@@ -17,6 +17,8 @@ import plotly.express as px
 from einops import rearrange
 from composition.neel_interp_stuff import get_comp_scores, get_k_comp_scores, get_q_comp_scores, get_v_comp_scores
 
+from torch.profiler import profile, record_function, ProfilerActivity
+
 cfg = EasyTransformerConfig(
     d_model=64,
     d_vocab=1000,
@@ -195,7 +197,7 @@ if __name__ == "__main__":
 
 # Out of function for now so I can get variables
 log = True
-num_epochs = 2000
+num_epochs = 3
 resume_run = False
 if True:
     # def train(model, num_epochs: int = 2000, log: bool = True, resume_run: bool = False):
@@ -228,12 +230,18 @@ if True:
         # tokens = t.randint(1, cfg["d_vocab"], (batch_size, cfg["n_ctx"]))
         tokens = tokens.to(device)
 
-        out = model(tokens)
+        # No ProfilerActivity.MPS?? .CUDA doesn't work
+        with profile(activities=[ProfilerActivity.CPU, ProfilerActivity.CUDA], record_shapes=True, profile_memory=True, with_stack=True) as prof:
+            with record_function("forward"):
+                out = model(tokens)
 
-        flat_out = rearrange(out[:, :-1], "b s ... -> (b s) ...")
-        flat_tokens = rearrange(tokens[:, 1:], "b s ... -> (b s) ...")
-        l = F.cross_entropy(flat_out, flat_tokens)
-        l.backward()
+            flat_out = rearrange(out[:, :-1], "b s ... -> (b s) ...")
+            flat_tokens = rearrange(tokens[:, 1:], "b s ... -> (b s) ...")
+            l = F.cross_entropy(flat_out, flat_tokens)
+            with record_function("backward"):
+                l.backward()
+
+        print(prof.key_averages(group_by_stack_n=5).table(sort_by='self_cpu_time_total', row_limit=10))
 
         optim.step()
         scheduler.step()
@@ -301,8 +309,8 @@ if True:
     # Uploading the plotly plots directly doesn't work for animations. See:
     # https://github.com/wandb/wandb/issues/2014
     # https://github.com/wandb/wandb/issues/2191
-    wandb.log({"W_QK_0": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=0, title="W_QK L1H0")))})
-    wandb.log({"W_QK_1": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=1, title="W_QK L1H1")))})
+    # wandb.log({"W_QK_0": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=0, title="W_QK L1H0")))})
+    # wandb.log({"W_QK_1": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=1, title="W_QK L1H1")))})
 
     if log:
         wandb.finish()
