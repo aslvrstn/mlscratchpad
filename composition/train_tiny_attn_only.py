@@ -15,7 +15,7 @@ import plotly
 import plotly.express as px
 
 from einops import rearrange
-from composition.neel_interp_stuff import get_comp_scores, get_k_comp_scores, get_q_comp_scores, get_v_comp_scores
+from neel_interp_stuff import get_comp_scores, get_k_comp_scores, get_q_comp_scores, get_v_comp_scores
 
 cfg = EasyTransformerConfig(
     d_model=64,

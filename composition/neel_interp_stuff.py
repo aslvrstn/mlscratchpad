@@ -200,7 +200,7 @@ if MAIN:
     plot_head_scores(ablation_scores)
 
 
-def run_and_cache_model_repeated_tokens(model, seq_len, batch=1) -> tuple[t.Tensor, t.Tensor, dict]:
+def run_and_cache_model_repeated_tokens(model, seq_len, batch=1) -> Tuple[t.Tensor, t.Tensor, dict]:
     """
     Generates a sequence of repeated random tokens, and runs the model on it, returning logits, tokens and cache
     Add a prefix token, since the model was always trained to have one.
@@ -433,7 +433,7 @@ def plot_comp_scores_baselined(model):
     ).show()
 
 
-def stranded_svd(A: t.Tensor, B: t.Tensor) -> tuple[t.Tensor, t.Tensor, t.Tensor]:
+def stranded_svd(A: t.Tensor, B: t.Tensor) -> Tuple[t.Tensor, t.Tensor, t.Tensor]:
     """
     Returns the SVD of AB in the torch format (ie (U, S, V^T))
     """
