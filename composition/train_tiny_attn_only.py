@@ -181,7 +181,7 @@ def load(config: Dict, path: str) -> Tuple[t.nn.Module, t.optim.Optimizer]:
 # %%
 
 
-device = "mps"
+device = "cuda"
 
 if __name__ == "__main__":
     model = EasyTransformer(cfg)
