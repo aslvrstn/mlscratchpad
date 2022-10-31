@@ -297,12 +297,13 @@ if True:
                 )
                 wandb.log({"w_qk_test": fig})
 
-    # Try to use up the wandb free tier as fast as possible with these 5MB HTML files
-    # Uploading the plotly plots directly doesn't work for animations. See:
-    # https://github.com/wandb/wandb/issues/2014
-    # https://github.com/wandb/wandb/issues/2191
-    wandb.log({"W_QK_0": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=0, title="W_QK L1H0")))})
-    wandb.log({"W_QK_1": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=1, title="W_QK L1H1")))})
+    if log:
+        # Try to use up the wandb free tier as fast as possible with these 5MB HTML files
+        # Uploading the plotly plots directly doesn't work for animations. See:
+        # https://github.com/wandb/wandb/issues/2014
+        # https://github.com/wandb/wandb/issues/2191
+        wandb.log({"W_QK_0": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=0, title="W_QK L1H0")))})
+        wandb.log({"W_QK_1": wandb.Html(plotly.io.to_html(animate(w_qk[::50], head_idx=1, title="W_QK L1H1")))})
 
     if log:
         wandb.finish()
