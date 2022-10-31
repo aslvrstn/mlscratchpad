@@ -25,7 +25,7 @@ cfg = EasyTransformerConfig(
     n_heads=2,
     d_head=32,
     attn_only=True,
-    # positional_embedding_type="shortformer"  # May want to enable this
+    positional_embedding_type="shortformer"  # May want to enable this
 )
 train_cfg = {
     "lr": 1e-2,
@@ -157,6 +157,13 @@ def animate(x: List[np.ndarray], head_idx: int, fix_scale: bool = False, title: 
 
 
 # %%
+def make_model_and_optimizer(cfg: EasyTransformerConfig) -> Tuple[t.nn.Module, t.optim.Optimizer]:
+    model = EasyTransformer(cfg)
+    model.to(device)
+
+    optim = t.optim.AdamW(model.parameters(), lr=train_cfg["lr"])
+    return model, optim
+
 def checkpoint(model: t.nn.Module, optim: t.optim.Optimizer, path: str) -> None:
     t.save(
         {
@@ -167,9 +174,8 @@ def checkpoint(model: t.nn.Module, optim: t.optim.Optimizer, path: str) -> None:
     )
 
 
-def load(config: Dict, path: str) -> Tuple[t.nn.Module, t.optim.Optimizer]:
-    model = EasyTransformer(config).to(device)
-    optim = t.optim.AdamW(model.parameters(), lr=config["lr"])
+def load(config: EasyTransformerConfig, path: str) -> Tuple[t.nn.Module, t.optim.Optimizer]:
+    model, optim = make_model_and_optimizer(config)
 
     checkpoint = t.load(path)
     model.load_state_dict(checkpoint["model_state_dict"])
@@ -178,19 +184,13 @@ def load(config: Dict, path: str) -> Tuple[t.nn.Module, t.optim.Optimizer]:
     return model, optim
 
 
-# %%
-
-
 device = "cuda"
 
 if __name__ == "__main__":
-    model = EasyTransformer(cfg)
-    model.to(device)
+    model, optim = make_model_and_optimizer(cfg)
 
-    optim = t.optim.AdamW(model.parameters(), lr=train_cfg["lr"])
     # scheduler = t.optim.lr_scheduler.MultiStepLR(optim, milestones=[1000, 1500], gamma=0.1)
     scheduler = t.optim.lr_scheduler.ConstantLR(optim, factor=1)  # Easy no-op schedule
-
 # %%
 
 # Out of function for now so I can get variables
@@ -311,7 +311,7 @@ if True:
 
 
 def predict(model, tokens: List[int]):
-    return model(tokens).argmax(-1)[:, -1]
+    return model(t.tensor([tokens])).argmax(-1)[:, -1]
 
 
 def line_up_induction(model, tokens: List[int]):
