@@ -2,7 +2,8 @@
 
 # Beforehand
 # cd /workspace
-# git clone https://github.com/aslvrstn/mlscratchpad.git
+# git clone https://github.com/aslvrstn/mlscratchpad.git or
+# GIT_SSH_COMMAND='ssh -i /workspace/mlscratch_deploy' git clone git@github.com:aslvrstn/mlscratchpad.git
 
 apt update
 # Fix some weirdness on default machines
