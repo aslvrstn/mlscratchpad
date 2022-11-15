@@ -15,7 +15,6 @@ import plotly
 import plotly.express as px
 
 from einops import rearrange
-from neel_interp_stuff import get_comp_scores, get_k_comp_scores, get_q_comp_scores, get_v_comp_scores
 
 cfg = EasyTransformerConfig(
     d_model=64,
@@ -157,7 +156,7 @@ def animate(x: List[np.ndarray], head_idx: int, fix_scale: bool = False, title: 
 
 
 # %%
-def make_model_and_optimizer(cfg: EasyTransformerConfig) -> Tuple[t.nn.Module, t.optim.Optimizer]:
+def make_model_and_optimizer(cfg: EasyTransformerConfig) -> Tuple[EasyTransformer, t.optim.Optimizer]:
     model = EasyTransformer(cfg)
     model.to(device)
 
@@ -186,11 +185,10 @@ def load(config: EasyTransformerConfig, path: str) -> Tuple[t.nn.Module, t.optim
 
 device = "cuda"
 
-if __name__ == "__main__":
-    model, optim = make_model_and_optimizer(cfg)
+model, optim = make_model_and_optimizer(cfg)
 
-    # scheduler = t.optim.lr_scheduler.MultiStepLR(optim, milestones=[1000, 1500], gamma=0.1)
-    scheduler = t.optim.lr_scheduler.ConstantLR(optim, factor=1)  # Easy no-op schedule
+# scheduler = t.optim.lr_scheduler.MultiStepLR(optim, milestones=[1000, 1500], gamma=0.1)
+scheduler = t.optim.lr_scheduler.ConstantLR(optim, factor=1)  # Easy no-op schedule
 # %%
 
 # Out of function for now so I can get variables
@@ -262,9 +260,9 @@ if True:
             w_ov_0.append(W_OV_0.detach().cpu().numpy())
             w_ov_1.append(W_OV_1.detach().cpu().numpy())
 
-            q_comp = get_q_comp_scores(W_QK, W_OV_0)
-            k_comp = get_k_comp_scores(W_QK, W_OV_0)
-            v_comp = get_v_comp_scores(W_OV_1, W_OV_0)
+            q_comp = model.all_composition_scores(mode="Q")
+            k_comp = model.all_composition_scores(mode="K")
+            v_comp = model.all_composition_scores(mode="V")
 
             for to_head in range(len(q_comp)):
                 for from_head in range(len(q_comp[to_head])):
