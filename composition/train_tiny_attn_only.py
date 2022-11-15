@@ -264,6 +264,12 @@ if True:
             k_comp = model.all_composition_scores(mode="K")
             v_comp = model.all_composition_scores(mode="V")
 
+            # These are A[to_layer][to_head][from_layer][from_head], so pull out only what we want
+            # in this 2x2 model
+            q_comp = q_comp[0,:,1,:]
+            k_comp = k_comp[0,:,1,:]
+            v_comp = v_comp[0,:,1,:]
+
             for to_head in range(len(q_comp)):
                 for from_head in range(len(q_comp[to_head])):
                     comp_scores[f"q_L1H{from_head}->L0H{to_head}"] = q_comp[to_head][from_head]
