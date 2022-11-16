@@ -2,6 +2,7 @@
 import dataclasses
 
 from easy_transformer import EasyTransformer, EasyTransformerConfig
+from easy_transformer.utils import FactoredMatrix, composition_scores
 from typing import List, Dict, Tuple
 
 import torch as t
@@ -260,15 +261,13 @@ if True:
             w_ov_0.append(W_OV_0.detach().cpu().numpy())
             w_ov_1.append(W_OV_1.detach().cpu().numpy())
 
-            q_comp = model.all_composition_scores(mode="Q")
-            k_comp = model.all_composition_scores(mode="K")
-            v_comp = model.all_composition_scores(mode="V")
-
-            # These are A[to_layer][to_head][from_layer][from_head], so pull out only what we want
-            # in this 2x2 model
-            q_comp = q_comp[0,:,1,:]
-            k_comp = k_comp[0,:,1,:]
-            v_comp = v_comp[0,:,1,:]
+            layer0 = model.blocks[0]
+            layer1 = model.blocks[1]
+            left = FactoredMatrix(layer0.attn.W_V, layer0.attn.W_O)
+            qk = FactoredMatrix(layer1.attn.W_Q, layer1.attn.W_K.transpose(-2, -1))
+            q_comp = composition_scores(left, qk)
+            k_comp = composition_scores(left, qk.T)
+            v_comp = composition_scores(left, FactoredMatrix(layer1.attn.W_V, layer1.attn.W_O))
 
             for to_head in range(len(q_comp)):
                 for from_head in range(len(q_comp[to_head])):
